@@ -3,7 +3,7 @@ version: '3.8'
 services:
   mqtt-broker:
     image: eclipse-mosquitto:latest
-    container_name: bozankaya_mqtt
+    container_name: pusula_mqtt
     ports:
       - "1883:1883"
       - "9001:9001"
@@ -13,7 +13,7 @@ services:
 
   postgres-db:
     image: postgres:15-alpine
-    container_name: bozankaya_db
+    container_name: pusula_db
     environment:
       POSTGRES_USER: hacer
       POSTGRES_PASSWORD: 12345
