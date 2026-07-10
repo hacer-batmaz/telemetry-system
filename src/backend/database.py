@@ -1,20 +1,20 @@
+import os
 import psycopg
 from psycopg.rows import dict_row
+from dotenv import load_dotenv
+
+#.env dosyasını okur ve çevre değişkenleri olarak hafızaya alır
+load_dotenv()
 
 #docker compose dosyasındaki db bilgileri
-DB_USER = "hacer"
-DB_PASSWORD = "12345"
-DB_HOST = "127.0.0.1"
-DB_PORT = "5432"
-DB_NAME = "telemetry_db"
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+DB_NAME = os.getenv("DB_NAME")
 
 def get_db_connection():
-    """
-    URL string yerine doğrudan parametre havuzu (kwargs) kullanarak
-    PostgreSQL bağlantısı kurar. URL çözümleme hatalarını kökten engeller.
-    """
     try:
-        # Bağlantıyı parametreleri açıkça vererek kuruyoruz
         conn = psycopg.connect(
             user=DB_USER,
             password=DB_PASSWORD,
@@ -25,5 +25,5 @@ def get_db_connection():
         )
         return conn
     except Exception as e:
-        print(f"[VERİTABANI HATASI] PostgreSQL bağlantısı kurulamadı: {e}")
+        print(f"[VERITABANI HATASI] PostgreSQL bağlantısı kurulamadı: {e}")
         return None
