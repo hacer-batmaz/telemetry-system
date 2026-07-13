@@ -32,16 +32,16 @@ def on_message(client, userdata, msg):
         #kartın kime ait olduğunu buluyoruz, yoksa misafir
         personel_adi = PERSONEL_HARITASI.get(kart_id, "Bilinmeyen / Misafir Personel")
 
-        print(f"[MQTT SINYAL] {arac_id} üzerinde KArt okundu. ID: {kart_id} | Personel: {personel_adi}")
+        print(f"[MQTT SINYAL] {arac_id} üzerinde Kart okundu. ID: {kart_id} | Personel: {personel_adi}")
 
         #veritabanına kaydetme
         conn = get_db_connection()
         if conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    INSERT INTO personel_loglari (kart_id, personel_adi, arac_id)
-                    VALUES (%s, %s, %s);
-                """, (kart_id, personel_adi, arac_id))
+                INSERT INTO personel_loglari (arac_id, kart_id, personel_adi, okunma_zamani)
+                VALUES (%s, %s, %s, NOW())
+            """, (arac_id, kart_id, personel_adi))
                 conn.commit()
             conn.close()
             print(f"[VERİTABANI] {personel_adi} geçiş logu başarıyla kaydedildi.")
@@ -99,28 +99,45 @@ def read_root():
 
 @app.get("/api/personel-loglari")
 def get_personel_loglari():
-    """
-    Veritabanındaki son 50 personel geçiş logunu listeler.
-    İleride Streamlit arayüzü bu uca istek atıp verileri ekrana basacak.
-    """
     conn = get_db_connection()
     if not conn:
-        raise HTTPException(status_code=500, detail="Veritabanı bağlantısı kurulamadı.")
-    
+        return []
     try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT id, kart_id, personel_adi, arac_id, 
-                       to_char(okunma_zamani, 'YYYY-MM-DD HH24:MI:SS') as zaman 
-                FROM personel_loglari 
-                ORDER BY okunma_zamani DESC 
-                LIMIT 50;
-            """)
-            logs = cur.fetchall()
+        cursor = conn.cursor()
+        # COALESCE içindeki sütun adını 'okunma_zamani' olarak güncelledik
+        cursor.execute("""
+            SELECT id, arac_id, kart_id, personel_adi, 
+                   COALESCE(to_char(okunma_zamani, 'HH24:MI:SS'), '-') as zaman,
+                   COALESCE(to_char(cikis_zamani, 'HH24:MI:SS'), '-') as cikis_zamani
+            FROM personel_loglari 
+            ORDER BY id DESC LIMIT 10
+        """)
+        logs = cursor.fetchall()
+        cursor.close()
         conn.close()
         return logs
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Sorgu hatası: {e}")
+    except Exception as db_err:
+        print(f"[API ERROR] Personel logları çekilemedi: {db_err}")
+        if 'cursor' in locals(): cursor.close()
+        if 'conn' in locals(): conn.close()
+        return []
+    
+@app.post("/api/sofor-cikis/arac01")
+def sofor_cikis():
+    conn = get_db_connection()
+    if not conn:
+        return {"status": "error"}
+    cursor = conn.cursor()
+    #veritabanında hem 'araç01' hem 'arac01' olma ihtimaline karşı ikisini de kapatıyor
+    cursor.execute("""
+        UPDATE personel_loglari 
+        SET cikis_zamani = NOW() 
+        WHERE (arac_id = 'araç01' OR arac_id = 'arac01') AND cikis_zamani IS NULL
+    """)
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return {"status": "success", "message": "araç01 şoförü başarıyla çıkarıldı."}
     
 @app.get("/api/telemetri")
 def get_telemetri():
